@@ -33,13 +33,15 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
-    
-    - name: Run CloudFormation template
-      run: |
-        aws cloudformation create-stack --stack-name secondstack --template-file scripts/deploy2.yml 
-        aws cloudformation wait stack-create-complete --stack-name secondstack
 
-    
+    - name: Check if CloudFormation stack exists
+      run: |
+        STACK=$(aws cloudformation describe-stacks --stack-name secondstack --query "Stacks[0].StackName" --output text)
+        if [ "$STACK" != "secondstack" ]; then
+          echo "Stack does not exist"
+          exit 1
+        fi
+
     - name: Run CloudFormation template
       run: |
         chmod +x scripts/deploy2.sh
