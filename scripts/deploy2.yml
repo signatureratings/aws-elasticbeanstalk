@@ -280,6 +280,15 @@ Resources:
       NetworkAclId:
         Ref: "PrivateNetworkAcl"
 
+  MyS3Bucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: "deploymentfilesbucket"
+      Tags:
+        - Key: "Name"
+          Value: "MyS3Bucket"
+        - Key: "Note"
+          Value: "This is a test S3 bucket to store the deployment files"
 
 
 
