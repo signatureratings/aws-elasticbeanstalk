@@ -1,0 +1,321 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Deploy reactjs app to Amplify"
+
+Resources:
+
+  MyVPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      Tags:
+        - Key: "Name"
+          Value: "MyVPC"
+        - Key: "Environment"
+          Value: "Testing"
+        - Key: "Note"
+          Value: "This is a test VPC"
+
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: "InternetGateway"
+
+  AttachGateway:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      InternetGatewayId:
+        Ref: "InternetGateway"
+
+  PublicSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      CidrBlock: "10.0.0.0/24"
+      AvailabilityZone: "us-east-1a"
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "PublicSubnet1"
+        - Key: "Environment"
+          Value: "Testing"
+        - Key: "Note"
+          Value: "This is a test public subnet 1 deployed in us-east-1a"
+
+  PublicSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      CidrBlock: "10.0.1.0/24"
+      AvailabilityZone: "us-east-1b"
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "PublicSubnet2"
+        - Key: "Environment"
+          Value: "Testing"
+        - Key: "Note"
+          Value: "This is a test public subnet 2 deployed in us-east-1b"
+
+  PrivateSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      CidrBlock: "10.0.2.0/24"
+      AvailabilityZone: "us-east-1a"
+      Tags:
+        - Key: "Name"
+          Value: "PrivateSubnet1"
+        - Key: "Environment"
+          Value: "Testing"
+        - Key: "Note"
+          Value: "This is a test private subnet 1 deployed in us-east-1a"
+
+  PrivateSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      CidrBlock: "10.0.3.0/24"
+      AvailabilityZone: "us-east-1b"
+      Tags:
+        - Key: "Name"
+          Value: "PrivateSubnet2"
+        - Key: "Environment"
+          Value: "Testing"
+        - Key: "Note"
+          Value: "This is a test private subnet 2 deployed in us-east-1b"
+
+  ElasticIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      Tags:
+        - Key: "Name"
+          Value: "PublicRouteTable"
+
+  PublicRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId:
+        Ref: "PublicRouteTable"
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId:
+        Ref: "InternetGateway"
+
+  PrivateRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      Tags:
+        - Key: "Name"
+          Value: "PrivateRouteTable"
+
+  PublicRouteTableAssociation1:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet1"
+      RouteTableId:
+        Ref: "PublicRouteTable"
+
+  PublicRouteTableAssociation2:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet2"
+      RouteTableId:
+        Ref: "PublicRouteTable"
+
+  PrivateRouteTableAssociation1:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PrivateSubnet1"
+      RouteTableId:
+        Ref: "PrivateRouteTable"
+
+  PrivateRouteTableAssociation2:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PrivateSubnet2"
+      RouteTableId:
+        Ref: "PrivateRouteTable"
+
+  NatGateway:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - ElasticIP
+          - AllocationId
+      SubnetId:
+        Ref: "PublicSubnet1"
+      Tags:
+        - Key: "Name"
+          Value: "NatGateway"
+
+  PrivateRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId:
+        Ref: "PrivateRouteTable"
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId:
+        Ref: "NatGateway"
+
+  #NACLs
+  # for the public NACL, allow all inbound and outbound traffic from internet
+  # for the private NACL, allow all inbound from the VPC CIDR block
+  # and allow all outbound traffic from internet
+
+  PublicNetworkAcl:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      Tags:
+        - Key: "Name"
+          Value: "PublicNetworkAcl"
+
+  PublicInboundRule:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: "allow"
+      Egress: "false"
+      CidrBlock: "0.0.0.0/0"
+
+  PublicOutboundRule:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: "allow"
+      Egress: "true"
+      CidrBlock: "0.0.0.0/0"
+
+  PrivateNetworkAcl:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      VpcId:
+        Ref: "MyVPC"
+      Tags:
+        - Key: "Name"
+          Value: "PrivateNetworkAcl"
+
+  PrivateInboundRule:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId:
+        Ref: "PrivateNetworkAcl"
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: "allow"
+      Egress: "false"
+      CidrBlock: "10.0.0.0/16"
+
+  PrivateOutboundRule:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId:
+        Ref: "PrivateNetworkAcl"
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: "allow"
+      Egress: "true"
+      CidrBlock: "0.0.0.0/0"
+
+  PublicSubnetNetworkAclAssociation1:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet1"
+
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+
+  PublicSubnetNetworkAclAssociation2:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet2"
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+
+  PrivateSubnetNetworkAclAssociation1:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PrivateSubnet1"
+      NetworkAclId:
+        Ref: "PrivateNetworkAcl"
+
+  PrivateSubnetNetworkAclAssociation2:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PrivateSubnet2"
+      NetworkAclId:
+        Ref: "PrivateNetworkAcl"
+
+
+
+
+
+
+
+Outputs:
+  MyVPC:
+    Description: "The ID of the VPC"
+    Value: !Ref "MyVPC"
+    Export:
+      Name: "MyVPC"
+
+  PublicSubnet1:
+    Description: "The ID of the Public Subnet 1"
+    Value: !Ref "PublicSubnet1"
+    Export:
+      Name: "PublicSubnet1"
+
+  PublicSubnet2:
+    Description: "The ID of the Public Subnet 2"
+    Value: !Ref "PublicSubnet2"
+    Export:
+      Name: "PublicSubnet2"
+
+  PrivateSubnet1:
+    Description: "The ID of the Private Subnet 1"
+    Value: !Ref "PrivateSubnet1"
+    Export:
+      Name: "PrivateSubnet1"
+
+  PrivateSubnet2:
+    Description: "The ID of the Private Subnet 2"
+    Value: !Ref "PrivateSubnet2"
+    Export:
+      Name: "PrivateSubnet2"
+
+
+  

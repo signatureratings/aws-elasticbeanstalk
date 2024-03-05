@@ -1,0 +1,46 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build
+      run: npm run build
+
+    - name: Zip build artifacts
+      run: zip -r build.zip build/
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Run CloudFormation template
+      run: |
+        aws cloudformation create-stack --stack-name secondstack --template-file scripts/deploy2.yml 
+        aws cloudformation wait stack-create-complete --stack-name secondstack
+
+    
+    - name: Run CloudFormation template
+      run: |
+        chmod +x scripts/deploy2.sh
+        ./scripts/deploy2.sh
